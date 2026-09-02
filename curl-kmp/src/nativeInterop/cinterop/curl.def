@@ -1,0 +1,16 @@
+package = curl
+headers = curl/curl.h curl_kmp_helpers.h
+compilerOpts = -DCURL_STATICLIB -DCURL_DISABLE_TYPECHECK -std=c11
+
+# Platform-specific linker options (suffixes are Kotlin/Native family names,
+# lowercase: osx/ios/tvos/linux/mingw/android). These are baked into the
+# produced klib and applied when the consumer's final binary is linked.
+# The merged libcurl.a (with mbedTLS) references these system libraries.
+# macOS: SystemConfiguration for libcurl's system-proxy detection
+# (CURL_MACOS_CALL_COPYPROXIES in curl_setup.h).
+linkerOpts.osx = -lm -framework SystemConfiguration
+linkerOpts.ios = -lm
+linkerOpts.tvos = -lm
+linkerOpts.linux = -lm -ldl -lpthread
+linkerOpts.mingw = -lws2_32 -lbcrypt -lpthread
+linkerOpts.android = -ldl -lm

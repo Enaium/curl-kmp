@@ -1,0 +1,6 @@
+[submodule "curl"]
+	path = includes/curl
+	url = git@github.com:curl/curl.git
+[submodule "mbedtls"]
+	path = includes/mbedtls
+	url = git@github.com:Mbed-TLS/mbedtls.git
