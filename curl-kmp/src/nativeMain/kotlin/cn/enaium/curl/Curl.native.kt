@@ -26,6 +26,7 @@ package cn.enaium.curl
 
 import kotlinx.cinterop.*
 import curl.*
+import platform.posix.size_t
 
 // =========================================================================
 // Native (cinterop) easy handle
@@ -39,8 +40,11 @@ import curl.*
  */
 private val nativeEasies = mutableMapOf<Long, NativeCurlEasy>()
 
+// size_t is 32-bit on 32-bit Android (UInt) and 64-bit elsewhere (ULong);
+// use the platform typealias so the callback matches curl_write_callback on
+// every target.
 private val nativeWriteCallback: curl_write_callback = staticCFunction {
-        ptr: CPointer<ByteVar>?, size: ULong, nmemb: ULong, userdata: COpaquePointer? ->
+        ptr: CPointer<ByteVar>?, size: size_t, nmemb: size_t, userdata: COpaquePointer? ->
     val easy = userdata?.rawValue?.toLong()?.let { nativeEasies[it] }
     if (easy != null && ptr != null) {
         val bytes = ptr.readBytes((size * nmemb).toInt())
@@ -50,7 +54,7 @@ private val nativeWriteCallback: curl_write_callback = staticCFunction {
 }
 
 private val nativeHeaderCallback: curl_write_callback = staticCFunction {
-        ptr: CPointer<ByteVar>?, size: ULong, nmemb: ULong, userdata: COpaquePointer? ->
+        ptr: CPointer<ByteVar>?, size: size_t, nmemb: size_t, userdata: COpaquePointer? ->
     val easy = userdata?.rawValue?.toLong()?.let { nativeEasies[it] }
     if (easy != null && ptr != null) {
         val bytes = ptr.readBytes((size * nmemb).toInt())
@@ -87,11 +91,11 @@ internal class NativeCurlEasy internal constructor(raw: COpaquePointer?) : CurlE
             pinnedPostFields?.unpin()
             pinnedPostFields = null
             if (value == null) {
-                checkCode(curl_kmp_easy_setopt_postfields(check(), null, 0uL))
+                checkCode(curl_kmp_easy_setopt_postfields(check(), null, 0L))
             } else {
                 val pinned = value.pin()
                 pinnedPostFields = pinned
-                checkCode(curl_kmp_easy_setopt_postfields(check(), pinned.addressOf(0), value.size.toULong()))
+                checkCode(curl_kmp_easy_setopt_postfields(check(), pinned.addressOf(0), value.size.toLong()))
             }
         }
 

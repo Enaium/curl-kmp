@@ -49,7 +49,9 @@ CURLcode curl_kmp_easy_setopt_long(CURL *easy, CURLoption opt, int64_t value);
 CURLcode curl_kmp_easy_setopt_pointer(CURL *easy, CURLoption opt, void *value);
 CURLcode curl_kmp_easy_setopt_writefunction(CURL *easy, curl_write_callback cb, void *userdata);
 CURLcode curl_kmp_easy_setopt_headerfunction(CURL *easy, curl_write_callback cb, void *userdata);
-CURLcode curl_kmp_easy_setopt_postfields(CURL *easy, const void *data, size_t len);
+/* len is int64_t (not size_t): size_t is 32-bit on Windows/32-bit Android,
+ * which would make cinterop expose it as UInt there and ULong elsewhere. */
+CURLcode curl_kmp_easy_setopt_postfields(CURL *easy, const void *data, int64_t len);
 CURLcode curl_kmp_easy_getinfo_long(CURL *easy, CURLINFO info, int64_t *value);
 CURLcode curl_kmp_easy_getinfo_string(CURL *easy, CURLINFO info, char **value);
 CURLcode curl_kmp_global_init(int flags);

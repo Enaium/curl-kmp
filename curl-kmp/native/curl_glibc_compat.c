@@ -23,19 +23,24 @@
 /*
  * glibc compatibility shims, Linux only.
  *
- * SDL3 built on a modern distro (glibc >= 2.38) may reference symbols that
- * the Kotlin/Native bundled Linux sysroot (glibc 2.19) does not provide:
+ * libcurl built on a modern distro (glibc >= 2.28) may reference symbols
+ * that the Kotlin/Native bundled Linux sysroot (glibc 2.19) does not
+ * provide:
  *
- *  - strlcpy/strlcat: added to glibc in 2.38; SDL detects them and calls
- *    them directly (SDL_strlcpy/SDL_strlcat delegate).
+ *  - strlcpy/strlcat: added to glibc in 2.38.
  *  - __isoc23_strtol/strtoul/strtoll/strtoull/strtof/strtod/strtold and
  *    __isoc23_fscanf/vfscanf/sscanf/vsscanf: glibc 2.38+ compiles calls to
- *    the C23 semantics variants when _GNU_SOURCE is defined (which SDL
- *    defines in SDL_internal.h).
+ *    the C23 semantics variants when _GNU_SOURCE is defined.
+ *  - fcntl64: glibc 2.28+ redirects fcntl() to fcntl64 when
+ *    _FILE_OFFSET_BITS=64 (which curl's CMake build defines).
+ *  - __explicit_bzero_chk / explicit_bzero: glibc 2.38+ fortified
+ *    secure-clearing helpers that curl references on Linux.
  *
  * These definitions are only pulled from the archive if referenced, so they
  * are harmless on systems where the real symbols exist.
  */
+
+#if defined(__linux__)
 
 #define _GNU_SOURCE 1
 #include <errno.h>
@@ -208,11 +213,52 @@ int posix_spawn_file_actions_addchdir_np(posix_spawn_file_actions_t *actions, co
 }
 
 /* memfd_create(2) was added to glibc in 2.27, but the Kotlin/Native bundled
- * Linux sysroot (glibc 2.19) does not provide it, so SDL's direct calls
- * (DBus portal notifications, Wayland shared-memory buffers) fail to link.
+ * Linux sysroot (glibc 2.19) does not provide it, so direct calls (DBus
+ * portal notifications, Wayland shared-memory buffers) fail to link.
  * Route through the raw syscall (kernel >= 3.17); it is only pulled from the
  * archive where the real symbol does not exist. */
 int memfd_create(const char *name, unsigned int flags)
 {
     return (int)syscall(SYS_memfd_create, name, flags);
 }
+
+/*
+ * glibc 2.28+ redirects fcntl() to fcntl64 at the asm-label level when
+ * _FILE_OFFSET_BITS=64 (which curl's CMake build defines), so a call to
+ * fcntl() from inside the wrapper would be redirected straight back into
+ * fcntl64, recursing forever. Call the real libc symbol through an explicit
+ * asm label instead, like the __isoc23_* wrappers above. The variadic
+ * argument is forwarded as a pointer-sized value, which covers every usage
+ * curl makes (F_SETFL/F_GETFL with an int, F_SETLK with a struct pointer).
+ */
+extern int __curl_glibc_fcntl(int fd, int cmd, ...) __asm__("fcntl");
+
+int fcntl64(int fd, int cmd, ...)
+{
+    va_list ap;
+    void *arg;
+    va_start(ap, cmd);
+    arg = va_arg(ap, void *);
+    va_end(ap);
+    return __curl_glibc_fcntl(fd, cmd, arg);
+}
+
+/*
+ * glibc 2.38+ fortified secure-clearing helpers. libcurl compiled against a
+ * modern glibc references __explicit_bzero_chk (and, without fortify,
+ * explicit_bzero); the Kotlin/Native bundled sysroot (glibc 2.19) provides
+ * neither. The _chk variant receives the caller's known buffer size; the
+ * archive build has no fortify, so it is ignored.
+ */
+void __explicit_bzero_chk(void *dest, size_t len, size_t destlen)
+{
+    (void)destlen;
+    memset(dest, 0, len);
+}
+
+void explicit_bzero(void *dest, size_t len)
+{
+    memset(dest, 0, len);
+}
+
+#endif /* __linux__ */

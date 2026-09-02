@@ -54,7 +54,7 @@ CURLcode curl_kmp_easy_setopt_headerfunction(CURL *easy, curl_write_callback cb,
  * the transfer runs. The native side keeps the ByteArray pinned; the JNI
  * bridge keeps an owned copy per handle. A NULL data resets the method back
  * to GET explicitly (curl keeps the POST flag otherwise). */
-CURLcode curl_kmp_easy_setopt_postfields(CURL *easy, const void *data, size_t len) {
+CURLcode curl_kmp_easy_setopt_postfields(CURL *easy, const void *data, int64_t len) {
     if (!data) {
         CURLcode rc = curl_easy_setopt(easy, CURLOPT_HTTPGET, 1L);
         if (rc != CURLE_OK) {
