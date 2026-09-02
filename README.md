@@ -21,7 +21,21 @@ Not supported: JavaScript and WebAssembly (no `wasmJs`/`js` target).
 
 ## Usage
 
-`build.gradle.kts`:
+### 1. Add the dependency
+
+`settings.gradle.kts` — make sure Maven Central is available:
+
+```kotlin
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+    }
+}
+```
+
+`build.gradle.kts` — add the dependency to `commonMain` (it works on every
+supported target from a single declaration; the matching JVM native library
+and native static library are resolved automatically):
 
 ```kotlin
 kotlin {
@@ -33,8 +47,27 @@ kotlin {
 }
 ```
 
+Or via the version catalog (`gradle/libs.versions.toml`):
+
+```toml
+[versions]
+curl-kmp = "1.0.0"
+
+[libraries]
+curl-kmp = { module = "cn.enaium.curl:curl-kmp", version.ref = "curl-kmp" }
+```
+
 ```kotlin
-import cn.enaium.curl.*
+commonMain.dependencies {
+    implementation(libs.curl.kmp)
+}
+```
+
+### 2. Import and use
+
+```kotlin
+import cn.enaium.curl.Curl
+import cn.enaium.curl.CurlCode
 
 fun main() {
     println("libcurl ${Curl.version()}") // e.g. "libcurl/8.22.0-DEV mbedTLS/3.6.7"
@@ -59,6 +92,11 @@ fun main() {
     }
 }
 ```
+
+No extra setup is needed on the JVM: the matching `curl-kmp-jni-jvm-{os}-{arch}`
+artifact is a transitive runtime dependency and `NativeLoader` loads the
+bundled `libcurl_jni` automatically. Native targets embed the static
+libcurl/mbedTLS library in the klib, so nothing needs to be installed either.
 
 ### API surface
 
