@@ -101,6 +101,20 @@ set(MBEDTLS_USE_STATIC_LIBS ON CACHE BOOL "" FORCE)
 
 add_subdirectory(${CURL_SOURCE_DIR} curl)
 
+# curl's mbedTLS backend (lib/vtls/mbedtls.c) keeps ONE global CTR_DRBG
+# (static struct rng_context_t rng) shared by every easy handle. mbedTLS's
+# ctr_drbg_random is not thread-safe by default; Downstorm runs 8 concurrent
+# parts, each doing its own TLS handshake, so concurrent calls race on the
+# DRBG state and corrupt the process heap. Enable mbedTLS's internal mutex
+# (pthread backend) on ALL translation units that see the mbedTLS structs —
+# including libcurl_static, which compiles curl's mbedtls.c — so the struct
+# layout (ctr_drbg gains a mutex member) stays consistent across the archive.
+set(MBEDTLS_THREAD_DEFS MBEDTLS_THREADING_C MBEDTLS_THREADING_PTHREAD)
+target_compile_definitions(mbedcrypto PRIVATE ${MBEDTLS_THREAD_DEFS})
+target_compile_definitions(mbedtls PRIVATE ${MBEDTLS_THREAD_DEFS})
+target_compile_definitions(mbedx509 PRIVATE ${MBEDTLS_THREAD_DEFS})
+target_compile_definitions(libcurl_static PRIVATE ${MBEDTLS_THREAD_DEFS})
+
 # ---------------------------------------------------------------------------
 # JNI shared library
 # ---------------------------------------------------------------------------
@@ -142,7 +156,9 @@ if(WIN32)
     # mbedTLS uses BCryptGenRandom for entropy; libcurl uses Winsock.
     target_link_libraries(curl_jni PRIVATE ws2_32 bcrypt)
 else()
-    target_link_libraries(curl_jni PRIVATE m)
+    find_package(Threads REQUIRED)
+    # pthread for MBEDTLS_THREADING_PTHREAD (the shared DRBG mutex).
+    target_link_libraries(curl_jni PRIVATE m Threads::Threads)
     if(APPLE AND NOT IOS)
         # libcurl's system-proxy detection (CURL_MACOS_CALL_COPYPROXIES).
         target_link_libraries(curl_jni PRIVATE "-framework SystemConfiguration")

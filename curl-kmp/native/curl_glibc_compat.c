@@ -261,4 +261,15 @@ void explicit_bzero(void *dest, size_t len)
     memset(dest, 0, len);
 }
 
+/*
+ * glibc 2.25+ (C23) secure-clearing helper. libcurl built against a modern
+ * glibc references memset_explicit from curlx_memzero/curlx_strzero when
+ * HAVE_MEMSET_EXPLICIT is detected; the Kotlin/Native bundled sysroot
+ * (glibc 2.19) does not provide it.
+ */
+void *memset_explicit(void *s, int c, size_t n)
+{
+    return memset(s, c, n);
+}
+
 #endif /* __linux__ */

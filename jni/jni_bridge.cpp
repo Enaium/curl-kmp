@@ -42,11 +42,17 @@ static jmethodID g_on_header = nullptr;
 // Note: the JavaVM is captured in curl_kmp_jni_init_callback_bridge via
 // env->GetJavaVM().
 JNIEnv *curl_kmp_jni_get_env() {
+    if (!g_vm) {
+        return nullptr; // bridge not initialized; callbacks stay inert
+    }
     JNIEnv *env = nullptr;
     if (g_vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
         // curl may invoke callbacks from an internal thread (e.g. the
         // threaded resolver); attach it so the JVM calls below work.
-        g_vm->AttachCurrentThread(reinterpret_cast<void **>(&env), nullptr);
+        // AttachCurrentThreadAsDaemon: a non-daemon attachment would pin
+        // the JVM and leak the thread once curl's internal thread exits
+        // without a matching detach.
+        g_vm->AttachCurrentThreadAsDaemon(reinterpret_cast<void **>(&env), nullptr);
     }
     return env;
 }
@@ -93,6 +99,16 @@ static size_t curl_kmp_write_cb(char *ptr, size_t size, size_t nmemb, void *user
     if (chunk) {
         env->SetByteArrayRegion(chunk, 0, len, reinterpret_cast<const jbyte *>(ptr));
         env->CallStaticVoidMethod(g_jni_class, g_on_write, id, chunk);
+        // The Kotlin callback may throw (e.g. the part writer closed by a
+        // concurrent remove/pause). Never let a pending exception leak into
+        // the next JNI call: that is undefined behavior and corrupts the
+        // process heap. Abort the transfer instead so the piece is retried
+        // from the last persisted byte.
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            env->DeleteLocalRef(chunk);
+            return 0;
+        }
         env->DeleteLocalRef(chunk);
     }
     return size * nmemb;
@@ -109,6 +125,13 @@ static size_t curl_kmp_header_cb(char *ptr, size_t size, size_t nmemb, void *use
     if (chunk) {
         env->SetByteArrayRegion(chunk, 0, len, reinterpret_cast<const jbyte *>(ptr));
         env->CallStaticVoidMethod(g_jni_class, g_on_header, id, chunk);
+        // See curl_kmp_write_cb: never let a pending exception leak into
+        // the next JNI call; abort the transfer instead.
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            env->DeleteLocalRef(chunk);
+            return 0;
+        }
         env->DeleteLocalRef(chunk);
     }
     return size * nmemb;
