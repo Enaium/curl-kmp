@@ -111,6 +111,19 @@ set(MBEDTLS_USE_STATIC_LIBS ON CACHE BOOL "" FORCE)
 
 add_subdirectory(${CURL_SOURCE_DIR} curl)
 
+# curl's mbedTLS backend (lib/vtls/mbedtls.c) keeps ONE global CTR_DRBG
+# shared by every easy handle. mbedTLS's ctr_drbg_random is not thread-safe
+# by default, so concurrent TLS handshakes race on the DRBG state and corrupt
+# the heap. Enable mbedTLS's internal mutex (pthread backend) on ALL
+# translation units that see the mbedTLS structs — including libcurl_static,
+# which compiles curl's mbedtls.c — so the struct layout (ctr_drbg gains a
+# mutex member) stays consistent across the merged archive.
+set(MBEDTLS_THREAD_DEFS MBEDTLS_THREADING_C MBEDTLS_THREADING_PTHREAD)
+target_compile_definitions(mbedcrypto PRIVATE ${MBEDTLS_THREAD_DEFS})
+target_compile_definitions(mbedtls PRIVATE ${MBEDTLS_THREAD_DEFS})
+target_compile_definitions(mbedx509 PRIVATE ${MBEDTLS_THREAD_DEFS})
+target_compile_definitions(libcurl_static PRIVATE ${MBEDTLS_THREAD_DEFS})
+
 # ---------------------------------------------------------------------------
 # cinterop helpers (merged into the archive as their own static library)
 # ---------------------------------------------------------------------------
