@@ -95,6 +95,18 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      # The fresh ubuntu-latest image has no cached Gradle distribution and
+      # services.gradle.org occasionally times out; retry the download.
+      - name: Warm up the Gradle distribution
+        run: |
+          ok=0
+          for attempt in 1 2 3 4 5; do
+            if ./gradlew --no-daemon --version; then ok=1; break; fi
+            echo "Gradle download failed (attempt $attempt), retrying..."
+            sleep 15
+          done
+          [ "$ok" = 1 ]
+
       - name: Decode signing key
         run: |
           echo "${{ secrets.SIGNING_KEY }}" | tr -d ' \n' | base64 -d > "$RUNNER_TEMP/signing-key.gpg"
@@ -146,6 +158,18 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
+
+      # The fresh ubuntu-latest image has no cached Gradle distribution and
+      # services.gradle.org occasionally times out; retry the download.
+      - name: Warm up the Gradle distribution
+        run: |
+          ok=0
+          for attempt in 1 2 3 4 5; do
+            if ./gradlew --no-daemon --version; then ok=1; break; fi
+            echo "Gradle download failed (attempt $attempt), retrying..."
+            sleep 15
+          done
+          [ "$ok" = 1 ]
 
       - name: Build androidNative klibs
         run: >
