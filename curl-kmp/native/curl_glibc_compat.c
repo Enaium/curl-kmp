@@ -272,4 +272,15 @@ void *memset_explicit(void *s, int c, size_t n)
     return memset(s, c, n);
 }
 
+/*
+ * With _FORTIFY_SOURCE (enabled by the distro toolchain) the memset_explicit
+ * call site resolves to the fortified variant instead, which the Kotlin/Native
+ * sysroot also lacks.
+ */
+void *__memset_explicit_chk(void *s, int c, size_t n, size_t destlen)
+{
+    (void)destlen;
+    return memset(s, c, n);
+}
+
 #endif /* __linux__ */
