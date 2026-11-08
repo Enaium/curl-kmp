@@ -24,7 +24,7 @@ name: Publish
 # the per-target klib modules, so all of them must be published before
 # consumers can resolve the artifact.
 #
-# Trigger: run manually via the Actions tab. Version is fixed at 1.0.0
+# Trigger: run manually via the Actions tab. Version is fixed at 8.23.0.1
 # (build.gradle.kts).
 #
 # Required repository secrets (Settings -> Secrets and variables -> Actions):

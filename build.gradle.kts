@@ -5,5 +5,5 @@ plugins {
 
 allprojects {
     group = "cn.enaium.curl"
-    version = "1.0.1"
+    version = "8.23.0.1"
 }

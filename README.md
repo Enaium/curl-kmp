@@ -41,7 +41,7 @@ and native static library are resolved automatically):
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation("cn.enaium.curl:curl-kmp:1.0.0")
+            implementation("cn.enaium.curl:curl-kmp:8.23.0.1")
         }
     }
 }
@@ -51,7 +51,7 @@ Or via the version catalog (`gradle/libs.versions.toml`):
 
 ```toml
 [versions]
-curl-kmp = "1.0.0"
+curl-kmp = "8.23.0.1"
 
 [libraries]
 curl-kmp = { module = "cn.enaium.curl:curl-kmp", version.ref = "curl-kmp" }
