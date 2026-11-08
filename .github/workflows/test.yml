@@ -197,14 +197,26 @@ jobs:
       - name: Install CMake
         shell: pwsh
         run: |
-          choco install cmake -y --no-progress
+          # GitHub release downloads from the runner are occasionally slow;
+          # retry until choco succeeds.
+          for ($i = 0; $i -lt 5; $i++) {
+            choco install cmake -y --no-progress
+            if ($LASTEXITCODE -eq 0) { break }
+            Start-Sleep -Seconds 20
+          }
+          if ($LASTEXITCODE -ne 0) { exit 1 }
           # cmake.exe may not be on PATH for the Gradle daemon.
           echo "C:\Program Files\CMake\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install MinGW
         shell: pwsh
         run: |
-          choco install mingw -y --no-progress
+          for ($i = 0; $i -lt 5; $i++) {
+            choco install mingw -y --no-progress
+            if ($LASTEXITCODE -eq 0) { break }
+            Start-Sleep -Seconds 20
+          }
+          if ($LASTEXITCODE -ne 0) { exit 1 }
           # The JVM needs MinGW's runtime DLLs (libwinpthread-1.dll,
           # libgcc_s_seh-1.dll) on PATH to load the JNI DLL.
           echo "C:\ProgramData\chocolatey\lib\mingw\tools\install\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
